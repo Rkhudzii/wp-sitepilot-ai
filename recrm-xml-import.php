@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 define( 'RECRM_XML_IMPORT_PATH', plugin_dir_path( __FILE__ ) );
 define( 'RECRM_XML_IMPORT_URL', plugin_dir_url( __FILE__ ) );
-define( 'RECRM_XML_IMPORT_VERSION', '2.4.0' );
+define( 'RECRM_XML_IMPORT_VERSION', '2.4.1' );
 define( 'RECRM_XML_IMPORT_GITHUB_REPO', 'Rkhudzii/wp-sitepilot-ai' );
 define( 'RECRM_XML_IMPORT_GITHUB_BRANCH', 'main' );
 
