@@ -1,0 +1,7 @@
+{
+  "label": "Chat Bot",
+  "description": "Модуль підключення AI-чату.",
+  "depends_on": [],
+  "github_managed": true,
+  "github_path": "modules/chatbot"
+}
