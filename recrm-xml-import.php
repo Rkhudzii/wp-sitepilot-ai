@@ -3,7 +3,7 @@
  * Plugin Name: WP SitePilot AI
  * Plugin URI: https://github.com/Rkhudzii/wp-sitepilot-ai
  * Description: Модульний плагін для нерухомості з GitHub-first ядром, самооновленням і менеджером модулів.
- * Version: 2.4.
+ * Version: 2.4.3
  * Author: Roman
  * License: GPL2+
  * Text Domain: wp-sitepilot-ai
