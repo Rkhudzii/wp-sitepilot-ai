@@ -379,42 +379,34 @@ function recrm_get_core_update_notice() {
 }
 
 function recrm_settings_field_core_updates() {
-    if ( ! class_exists( 'RECRM_GitHub_Updater' ) ) {
-        echo '<p>Оновлювач ядра не завантажився.</p>';
-        return;
-    }
-
-    $updater  = RECRM_GitHub_Updater::boot();
-    $state    = $updater->get_update_state();
     $settings = recrm_get_settings();
-    $source   = method_exists( $updater, 'get_github_source' ) ? $updater->get_github_source() : array();
-    $repo_badge = ! empty( $source['owner'] ) && ! empty( $source['repo'] )
-        ? sprintf( '%s/%s@%s', $source['owner'], $source['repo'], ! empty( $source['branch'] ) ? $source['branch'] : 'main' )
-        : 'GitHub';
     ?>
     <div style="display:grid; gap:12px; max-width:860px;">
         <div style="padding:14px 16px; border:1px solid #dbeafe; border-radius:14px; background:#eff6ff; color:#1d4ed8;">
-            Ядро плагіна працює в режимі <strong>GitHub-first</strong> і перевіряє оновлення з <strong><?php echo esc_html( $repo_badge ); ?></strong>.
+            Ядро плагіна працює в режимі <strong>GitHub-first</strong>, але перевірка GitHub вимкнена на екрані налаштувань, щоб не гальмувати адмінку.
         </div>
 
         <div style="padding:14px 16px; border:1px solid #e5e7eb; border-radius:14px; background:#fff;">
             <div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-bottom:14px;">
-                <div><div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:.06em;">Поточна версія</div><div style="margin-top:4px; font-size:18px; font-weight:700;"><?php echo esc_html( RECRM_XML_IMPORT_VERSION ); ?></div></div>
-                <div><div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:.06em;">GitHub версія</div><div style="margin-top:4px; font-size:18px; font-weight:700;"><?php echo esc_html( ! is_wp_error( $state ) && ! empty( $state['remote_version'] ) ? $state['remote_version'] : '—' ); ?></div></div>
-                <div><div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:.06em;">Статус</div><div style="margin-top:4px; font-size:18px; font-weight:700; color:<?php echo ( ! is_wp_error( $state ) && ! empty( $state['has_update'] ) ) ? '#b45309' : '#166534'; ?>;"><?php echo esc_html( ( ! is_wp_error( $state ) && ! empty( $state['has_update'] ) ) ? 'Є оновлення' : 'Актуально' ); ?></div></div>
+                <div>
+                    <div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:.06em;">Поточна версія</div>
+                    <div style="margin-top:4px; font-size:18px; font-weight:700;"><?php echo esc_html( RECRM_XML_IMPORT_VERSION ); ?></div>
+                </div>
+                <div>
+                    <div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:.06em;">GitHub версія</div>
+                    <div style="margin-top:4px; font-size:18px; font-weight:700;">Перевірка вручну</div>
+                </div>
+                <div>
+                    <div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:.06em;">Статус</div>
+                    <div style="margin-top:4px; font-size:18px; font-weight:700; color:#475569;">Без автоперевірки</div>
+                </div>
             </div>
 
-            <?php if ( is_wp_error( $state ) ) : ?>
-                <div style="margin-bottom:12px; padding:10px 12px; border-radius:10px; background:#fef2f2; color:#991b1b; border:1px solid #fecaca;">
-                    <?php echo esc_html( $state->get_error_message() ); ?>
-                </div>
-            <?php endif; ?>
+            <p style="margin:0 0 12px; color:#475569;">
+                Щоб не було довгого завантаження, GitHub не перевіряється автоматично при відкритті цієї сторінки.
+            </p>
 
             <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:12px;">
-                <a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=recrm_core_check_updates' ), 'recrm_core_check_updates' ) ); ?>">Перевірити оновлення</a>
-                <?php if ( ! is_wp_error( $state ) && ! empty( $state['has_update'] ) ) : ?>
-                    <a class="button button-primary" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=recrm_core_upgrade' ), 'recrm_core_upgrade' ) ); ?>">Оновити ядро зараз</a>
-                <?php endif; ?>
                 <a class="button" href="<?php echo esc_url( admin_url( 'plugins.php' ) ); ?>">Сторінка плагінів</a>
             </div>
 
@@ -422,7 +414,6 @@ function recrm_settings_field_core_updates() {
                 <input type="checkbox" name="recrm_settings[core_auto_update]" value="1" <?php checked( isset( $settings['core_auto_update'] ) ? $settings['core_auto_update'] : '0', '1' ); ?>>
                 Увімкнути автооновлення ядра
             </label>
-            <p class="description" style="margin:8px 0 0;">Коли WordPress знайде нову версію ядра в GitHub, він зможе встановити її автоматично.</p>
         </div>
     </div>
     <?php
@@ -430,15 +421,12 @@ function recrm_settings_field_core_updates() {
 
 function recrm_settings_field_modules() {
     $settings = recrm_get_settings();
-    $registry = function_exists( 'recrm_get_manageable_module_registry' ) ? recrm_get_manageable_module_registry() : recrm_get_module_registry();
-    $source   = function_exists( 'recrm_get_github_module_source' ) ? recrm_get_github_module_source() : array();
-    $repo_badge = ! empty( $source['owner'] ) && ! empty( $source['repo'] )
-        ? sprintf( '%s/%s@%s', $source['owner'], $source['repo'], ! empty( $source['branch'] ) ? $source['branch'] : 'main' )
-        : 'GitHub';
+    $registry = recrm_get_module_registry();
+    $repo_badge = 'GitHub';
     ?>
     <div style="display:grid; gap:12px; max-width:860px;">
         <div style="padding:12px 14px; border:1px solid #dbeafe; border-radius:14px; background:#eff6ff; color:#1d4ed8;">
-            Опціональні модулі встановлюються прямо з GitHub: <strong><?php echo esc_html( $repo_badge ); ?></strong><br><span style="display:inline-block; margin-top:6px;">Нові модулі з папки <code>modules</code> у GitHub підтягуються автоматично.</span>
+            Тут показані локальні модулі плагіна. GitHub не опитується автоматично при відкритті сторінки, щоб не гальмувати адмінку.
         </div>
 
         <?php foreach ( $registry as $module_key => $module_data ) : ?>
@@ -482,10 +470,9 @@ function recrm_settings_field_modules() {
 
                             <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
                                 <?php if ( $is_remote && ! $is_installed ) : ?>
-                                    <a class="button button-primary" href="<?php echo esc_url( recrm_get_manage_module_url( 'install', $module_key ) ); ?>">Завантажити з GitHub</a>
+                                    <span style="display:inline-flex; min-height:34px; align-items:center; padding:0 12px; border-radius:999px; background:#fef3c7; color:#92400e; font-weight:700;">Модуль недоступний локально</span>
                                 <?php elseif ( $is_remote && $is_installed ) : ?>
-                                    <a class="button" href="<?php echo esc_url( recrm_get_manage_module_url( 'sync', $module_key ) ); ?>">Оновити з GitHub</a>
-                                    <a class="button" href="<?php echo esc_url( recrm_get_manage_module_url( 'delete', $module_key ) ); ?>" onclick="return confirm('Видалити локальні файли модуля <?php echo esc_js( $module_data['label'] ); ?>?');">Видалити модуль</a>
+                                    <span style="display:inline-flex; min-height:34px; align-items:center; padding:0 12px; border-radius:999px; background:#dcfce7; color:#166534; font-weight:700;">Модуль доступний локально</span>
                                 <?php endif; ?>
                             </div>
                         <?php endif; ?>
