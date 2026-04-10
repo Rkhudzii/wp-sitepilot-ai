@@ -24,7 +24,6 @@ class RECRM_GitHub_Updater {
 
         add_filter( 'pre_set_site_transient_update_plugins', array( $this, 'inject_update' ) );
         add_filter( 'plugins_api', array( $this, 'plugins_api' ), 20, 3 );
-        add_filter( 'auto_update_plugin', array( $this, 'maybe_auto_update' ), 20, 2 );
 
         add_action( 'upgrader_process_complete', array( $this, 'clear_cache_after_upgrade' ), 10, 2 );
     }
@@ -122,12 +121,12 @@ class RECRM_GitHub_Updater {
     protected function parse_plugin_headers_from_body( $body ) {
         $data = array();
         $map  = array(
-            'name'        => 'Plugin Name',
-            'version'     => 'Version',
-            'description' => 'Description',
-            'author'      => 'Author',
-            'requires_php'=> 'Requires PHP',
-            'requires_wp' => 'Requires at least',
+            'name'         => 'Plugin Name',
+            'version'      => 'Version',
+            'description'  => 'Description',
+            'author'       => 'Author',
+            'requires_php' => 'Requires PHP',
+            'requires_wp'  => 'Requires at least',
         );
 
         foreach ( $map as $target => $header ) {
@@ -146,23 +145,24 @@ class RECRM_GitHub_Updater {
         }
 
         $metadata = array(
-            'name'        => 'RE CRM XML Import',
-            'slug'        => dirname( $this->plugin_basename ),
-            'plugin'      => $this->plugin_basename,
-            'version'     => '',
-            'description' => 'Оновлення ядра RE CRM із GitHub.',
-            'author'      => 'Roman',
-            'homepage'    => $this->get_repo_url(),
-            'package'     => $this->get_package_url(),
-            'tested'      => '',
-            'requires'    => '',
-            'requires_php'=> '',
-            'sections'    => array(),
+            'name'         => 'WP SitePilot AI',
+            'slug'         => dirname( $this->plugin_basename ),
+            'plugin'       => $this->plugin_basename,
+            'version'      => '',
+            'description'  => 'Оновлення ядра плагіна із GitHub.',
+            'author'       => 'Roman',
+            'homepage'     => $this->get_repo_url(),
+            'package'      => $this->get_package_url(),
+            'tested'       => '',
+            'requires'     => '',
+            'requires_php' => '',
+            'sections'     => array(),
         );
 
         $plugin_json_response = $this->remote_get( $this->get_plugin_json_url() );
         if ( ! is_wp_error( $plugin_json_response ) && 200 === (int) wp_remote_retrieve_response_code( $plugin_json_response ) ) {
             $json = json_decode( wp_remote_retrieve_body( $plugin_json_response ), true );
+
             if ( is_array( $json ) ) {
                 $metadata['name']         = ! empty( $json['name'] ) ? sanitize_text_field( $json['name'] ) : $metadata['name'];
                 $metadata['version']      = ! empty( $json['version'] ) ? sanitize_text_field( $json['version'] ) : $metadata['version'];
@@ -173,6 +173,7 @@ class RECRM_GitHub_Updater {
                 $metadata['tested']       = ! empty( $json['tested'] ) ? sanitize_text_field( $json['tested'] ) : '';
                 $metadata['requires']     = ! empty( $json['requires'] ) ? sanitize_text_field( $json['requires'] ) : '';
                 $metadata['requires_php'] = ! empty( $json['requires_php'] ) ? sanitize_text_field( $json['requires_php'] ) : '';
+
                 if ( ! empty( $json['sections'] ) && is_array( $json['sections'] ) ) {
                     $metadata['sections'] = array_map( 'wp_kses_post', $json['sections'] );
                 }
@@ -181,6 +182,7 @@ class RECRM_GitHub_Updater {
 
         if ( '' === $metadata['version'] ) {
             $main_file_response = $this->remote_get( $this->get_remote_main_file_url() );
+
             if ( is_wp_error( $main_file_response ) ) {
                 return $main_file_response;
             }
@@ -190,6 +192,7 @@ class RECRM_GitHub_Updater {
             }
 
             $headers = $this->parse_plugin_headers_from_body( wp_remote_retrieve_body( $main_file_response ) );
+
             $metadata['name']         = ! empty( $headers['name'] ) ? $headers['name'] : $metadata['name'];
             $metadata['version']      = ! empty( $headers['version'] ) ? $headers['version'] : $metadata['version'];
             $metadata['description']  = ! empty( $headers['description'] ) ? $headers['description'] : $metadata['description'];
@@ -216,11 +219,12 @@ class RECRM_GitHub_Updater {
 
     public function get_update_state( $force = false ) {
         $remote = $this->get_remote_metadata( $force );
+
         if ( is_wp_error( $remote ) ) {
             return $remote;
         }
 
-        $state = array(
+        return array(
             'current_version' => RECRM_XML_IMPORT_VERSION,
             'remote_version'  => $remote['version'],
             'has_update'      => version_compare( RECRM_XML_IMPORT_VERSION, $remote['version'], '<' ),
@@ -229,8 +233,6 @@ class RECRM_GitHub_Updater {
             'checked_at'      => time(),
             'remote'          => $remote,
         );
-
-        return $state;
     }
 
     public function inject_update( $transient ) {
@@ -239,22 +241,23 @@ class RECRM_GitHub_Updater {
         }
 
         $state = $this->get_update_state();
+
         if ( is_wp_error( $state ) || empty( $state['has_update'] ) ) {
             return $transient;
         }
 
         $update = new stdClass();
-        $update->slug        = dirname( $this->plugin_basename );
-        $update->plugin      = $this->plugin_basename;
-        $update->new_version = $state['remote_version'];
-        $update->url         = $state['homepage'];
-        $update->package     = $state['package'];
-        $update->icons       = array();
-        $update->banners     = array();
-        $update->tested      = ! empty( $state['remote']['tested'] ) ? $state['remote']['tested'] : '';
-        $update->requires    = ! empty( $state['remote']['requires'] ) ? $state['remote']['requires'] : '';
-        $update->requires_php = ! empty( $state['remote']['requires_php'] ) ? $state['remote']['requires_php'] : '';
-        $update->compatibility = new stdClass();
+        $update->slug           = dirname( $this->plugin_basename );
+        $update->plugin         = $this->plugin_basename;
+        $update->new_version    = $state['remote_version'];
+        $update->url            = $state['homepage'];
+        $update->package        = $state['package'];
+        $update->icons          = array();
+        $update->banners        = array();
+        $update->tested         = ! empty( $state['remote']['tested'] ) ? $state['remote']['tested'] : '';
+        $update->requires       = ! empty( $state['remote']['requires'] ) ? $state['remote']['requires'] : '';
+        $update->requires_php   = ! empty( $state['remote']['requires_php'] ) ? $state['remote']['requires_php'] : '';
+        $update->compatibility  = new stdClass();
 
         $transient->response[ $this->plugin_basename ] = $update;
 
@@ -267,6 +270,7 @@ class RECRM_GitHub_Updater {
         }
 
         $remote = $this->get_remote_metadata();
+
         if ( is_wp_error( $remote ) ) {
             return $result;
         }
@@ -289,20 +293,6 @@ class RECRM_GitHub_Updater {
         return $info;
     }
 
-    public function maybe_auto_update( $update, $item ) {
-        if ( empty( $item->plugin ) || $this->plugin_basename !== $item->plugin ) {
-            return $update;
-        }
-
-        return '1' === get_option( 'recrm_core_auto_update', '0' );
-    }
-
-    public function add_plugin_action_links( $links ) {
-        $settings_url = admin_url( 'admin.php?page=recrm-settings' );
-        array_unshift( $links, '<a href="' . esc_url( $settings_url ) . '">Оновлення ядра</a>' );
-        return $links;
-    }
-
     public function clear_cache_after_upgrade( $upgrader, $options ) {
         if ( empty( $options['action'] ) || 'update' !== $options['action'] || empty( $options['type'] ) || 'plugin' !== $options['type'] ) {
             return;
@@ -311,74 +301,5 @@ class RECRM_GitHub_Updater {
         if ( ! empty( $options['plugins'] ) && in_array( $this->plugin_basename, (array) $options['plugins'], true ) ) {
             $this->clear_cached_remote_data();
         }
-    }
-
-    protected function get_redirect_url() {
-        return admin_url( 'admin.php?page=recrm-settings&tab=core-updates' );
-    }
-
-    public function handle_manual_check() {
-        if ( ! current_user_can( 'update_plugins' ) ) {
-            wp_die( 'Недостатньо прав.' );
-        }
-
-        check_admin_referer( 'recrm_core_check_updates' );
-
-        $this->clear_cached_remote_data();
-        wp_update_plugins();
-
-        wp_safe_redirect( add_query_arg( 'recrm_notice', 'core_checked', $this->get_redirect_url() ) );
-        exit;
-    }
-
-    public function handle_manual_upgrade() {
-        if ( ! current_user_can( 'update_plugins' ) ) {
-            wp_die( 'Недостатньо прав.' );
-        }
-
-        check_admin_referer( 'recrm_core_upgrade' );
-
-        $state = $this->get_update_state( true );
-        if ( is_wp_error( $state ) ) {
-            wp_safe_redirect( add_query_arg( array( 'recrm_notice' => 'core_upgrade_error', 'recrm_error' => rawurlencode( $state->get_error_message() ) ), $this->get_redirect_url() ) );
-            exit;
-        }
-
-        if ( empty( $state['has_update'] ) ) {
-            wp_safe_redirect( add_query_arg( 'recrm_notice', 'core_no_update', $this->get_redirect_url() ) );
-            exit;
-        }
-
-        $this->clear_cached_remote_data();
-        wp_update_plugins();
-
-        require_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
-        require_once ABSPATH . 'wp-admin/includes/plugin-install.php';
-        require_once ABSPATH . 'wp-admin/includes/file.php';
-        require_once ABSPATH . 'wp-admin/includes/plugin.php';
-
-        $skin     = new Automatic_Upgrader_Skin();
-        $upgrader = new Plugin_Upgrader( $skin );
-        $result   = $upgrader->upgrade( $this->plugin_basename );
-
-        $this->clear_cached_remote_data();
-
-        if ( is_wp_error( $result ) ) {
-            $message = $result->get_error_message();
-            wp_safe_redirect( add_query_arg( array( 'recrm_notice' => 'core_upgrade_error', 'recrm_error' => rawurlencode( $message ) ), $this->get_redirect_url() ) );
-            exit;
-        }
-
-        if ( false === $result ) {
-            $message = $skin->get_error_messages();
-            if ( empty( $message ) ) {
-                $message = 'Не вдалося завершити оновлення ядра.';
-            }
-            wp_safe_redirect( add_query_arg( array( 'recrm_notice' => 'core_upgrade_error', 'recrm_error' => rawurlencode( wp_strip_all_tags( $message ) ) ), $this->get_redirect_url() ) );
-            exit;
-        }
-
-        wp_safe_redirect( add_query_arg( 'recrm_notice', 'core_updated', $this->get_redirect_url() ) );
-        exit;
     }
 }
