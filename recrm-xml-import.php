@@ -3,7 +3,7 @@
  * Plugin Name: RE CRM XML Import
  * Plugin URI: https://example.com/
  * Description: Модульний плагін для нерухомості з GitHub-first ядром, самооновленням і менеджером модулів.
- * Version: 2.4.0
+ * Version: 2.4.1
  * Author: Roman
  * License: GPL2+
  */
