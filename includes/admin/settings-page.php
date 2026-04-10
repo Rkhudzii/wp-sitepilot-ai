@@ -13,21 +13,6 @@ function recrm_register_settings() {
     );
 
     add_settings_section(
-        'recrm_modules_section',
-        'Модулі',
-        '__return_false',
-        'recrm-settings'
-    );
-
-    add_settings_field(
-        'modules',
-        'Керування модулями',
-        'recrm_settings_field_modules',
-        'recrm-settings',
-        'recrm_modules_section'
-    );
-
-    add_settings_section(
         'recrm_core_updates_section',
         'Оновлення ядра',
         '__return_false',
@@ -249,14 +234,6 @@ function recrm_register_settings() {
         'schema_company_description',
         'Опис компанії',
         'recrm_settings_field_schema_company_description',
-        'recrm-settings',
-        'recrm_schema_section'
-    );
-
-    add_settings_field(
-        'schema_preview',
-        'Preview JSON-LD',
-        'recrm_settings_field_schema_preview',
         'recrm-settings',
         'recrm_schema_section'
     );
@@ -677,25 +654,6 @@ function recrm_settings_field_schema_company_description() {
     <p class="description">Короткий опис компанії для пошукових систем та AI.</p>
     <?php
 }
-
-
-
-
-
-
-
-function recrm_settings_field_schema_preview() {
-    $preview = '';
-
-    if ( function_exists( 'recrm_get_schema_preview_json' ) ) {
-        $preview = recrm_get_schema_preview_json();
-    }
-    ?>
-    <textarea rows="22" class="large-text code" readonly style="font-family: Consolas, Monaco, monospace;"><?php echo esc_textarea( $preview ); ?></textarea>
-    <p class="description">Це preview того JSON-LD, який буде виводитись на сайті згідно з поточними налаштуваннями.</p>
-    <?php
-}
-
 
 function recrm_render_settings_page() {
     $settings = recrm_get_settings();
