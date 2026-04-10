@@ -25,11 +25,8 @@ class RECRM_GitHub_Updater {
         add_filter( 'pre_set_site_transient_update_plugins', array( $this, 'inject_update' ) );
         add_filter( 'plugins_api', array( $this, 'plugins_api' ), 20, 3 );
         add_filter( 'auto_update_plugin', array( $this, 'maybe_auto_update' ), 20, 2 );
-        add_filter( 'plugin_action_links_' . $this->plugin_basename, array( $this, 'add_plugin_action_links' ) );
 
         add_action( 'upgrader_process_complete', array( $this, 'clear_cache_after_upgrade' ), 10, 2 );
-        add_action( 'admin_post_recrm_core_check_updates', array( $this, 'handle_manual_check' ) );
-        add_action( 'admin_post_recrm_core_upgrade', array( $this, 'handle_manual_upgrade' ) );
     }
 
     public function get_plugin_basename() {
