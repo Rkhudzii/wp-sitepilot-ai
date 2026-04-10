@@ -1,7 +1,7 @@
 {
   "name": "WP SitePilot AI",
   "slug": "wp-sitepilot-ai",
-  "version": "2.4.1",
+  "version": "2.4.2",
   "homepage": "https://github.com/Rkhudzii/wp-sitepilot-ai",
   "package": "https://github.com/Rkhudzii/wp-sitepilot-ai/releases/download/v2.4.1/wp-sitepilot-ai.zip",
   "requires": "6.0",
@@ -9,6 +9,6 @@
   "tested": "6.8",
   "sections": {
     "description": "Оновлення ядра плагіна з GitHub.",
-    "changelog": "Версія 2.4.1: оновлення ядра."
+    "changelog": "Версія 2.4.2: оновлення ядра."
   }
 }
