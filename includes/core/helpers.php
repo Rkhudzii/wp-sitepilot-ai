@@ -4,34 +4,362 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-
-function recrm_get_module_registry() {
+function recrm_get_core_module_registry() {
     return array(
         'property' => array(
-            'label'        => 'Property',
-            'description'  => 'Базовий модуль: CPT, таксономії, картки та фронтенд обʼєктів.',
-            'always_on'    => true,
-            'depends_on'   => array(),
+            'label'          => 'Property',
+            'description'    => 'Базовий модуль: CPT, таксономії, картки та фронтенд обʼєктів.',
+            'always_on'      => true,
+            'depends_on'     => array(),
+            'github_managed' => false,
+            'github_path'    => 'modules/property',
         ),
         'filter' => array(
-            'label'        => 'Фільтр',
-            'description'  => 'Фільтр, builder, архівні списки та AJAX-фільтрація.',
-            'always_on'    => false,
-            'depends_on'   => array( 'property' ),
+            'label'          => 'Фільтр',
+            'description'    => 'Фільтр, builder, архівні списки та AJAX-фільтрація.',
+            'always_on'      => false,
+            'depends_on'     => array( 'property' ),
+            'github_managed' => true,
+            'github_path'    => 'modules/filter',
         ),
         'seo' => array(
-            'label'        => 'SEO',
-            'description'  => 'SEO-поля, schema, noindex, score та SEO-структура.',
-            'always_on'    => false,
-            'depends_on'   => array(),
+            'label'          => 'SEO',
+            'description'    => 'SEO-поля, schema, noindex, score та SEO-структура.',
+            'always_on'      => false,
+            'depends_on'     => array(),
+            'github_managed' => true,
+            'github_path'    => 'modules/seo',
         ),
         'import' => array(
-            'label'        => 'Імпорт',
-            'description'  => 'XML-імпорт обʼєктів, cron і сторінка ручного імпорту.',
-            'always_on'    => false,
-            'depends_on'   => array(),
+            'label'          => 'Імпорт',
+            'description'    => 'XML-імпорт обʼєктів, cron і сторінка ручного імпорту.',
+            'always_on'      => false,
+            'depends_on'     => array(),
+            'github_managed' => true,
+            'github_path'    => 'modules/import',
+        ),
+        'chatgpt' => array(
+            'label'          => 'ChatGPT',
+            'description'    => 'Налаштування підключення ChatGPT та окрема адмін-сторінка для AI-функцій.',
+            'always_on'      => false,
+            'depends_on'     => array(),
+            'github_managed' => true,
+            'github_path'    => 'modules/chatgpt',
         ),
     );
+}
+
+function recrm_format_module_label( $module_key ) {
+    $label = str_replace( array( '-', '_' ), ' ', sanitize_key( $module_key ) );
+    $label = ucwords( $label );
+
+    if ( 'Chatgpt' === $label ) {
+        return 'ChatGPT';
+    }
+
+    if ( 'Seo' === $label ) {
+        return 'SEO';
+    }
+
+    return $label;
+}
+
+function recrm_normalize_module_registry_entry( $module_key, $data = array() ) {
+    $module_key = sanitize_key( $module_key );
+    $data       = is_array( $data ) ? $data : array();
+
+    $label = ! empty( $data['label'] ) ? sanitize_text_field( $data['label'] ) : recrm_format_module_label( $module_key );
+    $description = ! empty( $data['description'] )
+        ? sanitize_text_field( $data['description'] )
+        : sprintf( 'Модуль %s.', $label );
+
+    $depends_on = array();
+    if ( ! empty( $data['depends_on'] ) ) {
+        foreach ( (array) $data['depends_on'] as $dependency ) {
+            $dependency = sanitize_key( $dependency );
+            if ( '' !== $dependency ) {
+                $depends_on[] = $dependency;
+            }
+        }
+        $depends_on = array_values( array_unique( $depends_on ) );
+    }
+
+    $always_on = ! empty( $data['always_on'] );
+
+    $github_path = '';
+    if ( ! empty( $data['github_path'] ) ) {
+        $github_path = trim( (string) $data['github_path'], '/' );
+    } elseif ( ! $always_on ) {
+        $github_path = 'modules/' . $module_key;
+    }
+
+    $github_managed = $always_on ? false : ! empty( $data['github_managed'] );
+    if ( ! $always_on && '' !== $github_path ) {
+        $github_managed = true;
+    }
+
+    return array(
+        'label'          => $label,
+        'description'    => $description,
+        'always_on'      => $always_on,
+        'depends_on'     => $depends_on,
+        'github_managed' => $github_managed,
+        'github_path'    => $github_path,
+    );
+}
+
+function recrm_get_local_module_directories() {
+    $modules_dir = trailingslashit( RECRM_XML_IMPORT_PATH . 'modules' );
+    if ( ! is_dir( $modules_dir ) ) {
+        return array();
+    }
+
+    $items = scandir( $modules_dir );
+    if ( false === $items ) {
+        return array();
+    }
+
+    $modules = array();
+
+    foreach ( $items as $item ) {
+        if ( '.' === $item || '..' === $item || '.' === substr( $item, 0, 1 ) ) {
+            continue;
+        }
+
+        $module_key = sanitize_key( $item );
+        if ( '' === $module_key ) {
+            continue;
+        }
+
+        $module_dir = trailingslashit( $modules_dir . $item );
+        if ( ! is_dir( $module_dir ) ) {
+            continue;
+        }
+
+        if ( file_exists( $module_dir . 'bootstrap.php' ) ) {
+            $modules[] = $module_key;
+        }
+    }
+
+    sort( $modules );
+
+    return array_values( array_unique( $modules ) );
+}
+
+function recrm_should_query_remote_modules() {
+    if ( defined( 'WP_CLI' ) && WP_CLI ) {
+        return true;
+    }
+
+    if ( ! is_admin() ) {
+        return false;
+    }
+
+    $page   = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+    $action = isset( $_GET['action'] ) ? sanitize_key( wp_unslash( $_GET['action'] ) ) : '';
+
+    if ( 'recrm-settings' === $page || 'recrm_manage_module' === $action ) {
+        return true;
+    }
+
+    return false;
+}
+
+function recrm_get_remote_modules_cache_key() {
+    return 'recrm_remote_module_dirs_v1';
+}
+
+function recrm_get_remote_module_manifest_cache_key( $module_key ) {
+    return 'recrm_remote_module_manifest_' . sanitize_key( $module_key ) . '_v1';
+}
+
+function recrm_clear_remote_module_registry_cache() {
+    delete_transient( recrm_get_remote_modules_cache_key() );
+
+    foreach ( recrm_get_local_module_directories() as $module_key ) {
+        delete_transient( recrm_get_remote_module_manifest_cache_key( $module_key ) );
+    }
+
+    foreach ( array_keys( recrm_get_core_module_registry() ) as $module_key ) {
+        delete_transient( recrm_get_remote_module_manifest_cache_key( $module_key ) );
+    }
+}
+
+function recrm_get_remote_module_directories() {
+    $cache_key = recrm_get_remote_modules_cache_key();
+    $cached    = get_transient( $cache_key );
+
+    if ( is_array( $cached ) ) {
+        return $cached;
+    }
+
+    if ( ! recrm_should_query_remote_modules() || ! function_exists( 'recrm_github_api_request' ) ) {
+        return array();
+    }
+
+    $items = recrm_github_api_request( 'modules' );
+    if ( is_wp_error( $items ) || ! is_array( $items ) ) {
+        return array();
+    }
+
+    $modules = array();
+
+    foreach ( $items as $item ) {
+        if ( empty( $item['type'] ) || 'dir' !== $item['type'] || empty( $item['name'] ) ) {
+            continue;
+        }
+
+        $module_key = sanitize_key( $item['name'] );
+        if ( '' === $module_key ) {
+            continue;
+        }
+
+        $modules[] = $module_key;
+    }
+
+    sort( $modules );
+    $modules = array_values( array_unique( $modules ) );
+
+    set_transient( $cache_key, $modules, 12 * HOUR_IN_SECONDS );
+
+    return $modules;
+}
+
+function recrm_get_local_module_manifest( $module_key ) {
+    $module_key = sanitize_key( $module_key );
+    $manifest   = trailingslashit( RECRM_XML_IMPORT_PATH . 'modules/' . $module_key ) . 'module.json';
+
+    if ( ! file_exists( $manifest ) ) {
+        return array();
+    }
+
+    $contents = file_get_contents( $manifest );
+    if ( false === $contents ) {
+        return array();
+    }
+
+    $data = json_decode( $contents, true );
+
+    return is_array( $data ) ? $data : array();
+}
+
+function recrm_get_remote_module_manifest( $module_key ) {
+    $module_key = sanitize_key( $module_key );
+    $cache_key  = recrm_get_remote_module_manifest_cache_key( $module_key );
+    $cached     = get_transient( $cache_key );
+
+    if ( is_array( $cached ) ) {
+        return $cached;
+    }
+
+    if ( ! recrm_should_query_remote_modules() || ! function_exists( 'recrm_github_api_request' ) ) {
+        return array();
+    }
+
+    $manifest = recrm_github_api_request( 'modules/' . $module_key . '/module.json' );
+    if ( is_wp_error( $manifest ) || ! is_array( $manifest ) || empty( $manifest['download_url'] ) ) {
+        return array();
+    }
+
+    $contents = recrm_github_download_file_contents( $manifest['download_url'] );
+    if ( is_wp_error( $contents ) ) {
+        return array();
+    }
+
+    $data = json_decode( $contents, true );
+    if ( ! is_array( $data ) ) {
+        return array();
+    }
+
+    set_transient( $cache_key, $data, 12 * HOUR_IN_SECONDS );
+
+    return $data;
+}
+
+function recrm_sort_module_registry( $registry ) {
+    if ( isset( $registry['property'] ) ) {
+        $property = array( 'property' => $registry['property'] );
+        unset( $registry['property'] );
+        ksort( $registry );
+        return $property + $registry;
+    }
+
+    ksort( $registry );
+    return $registry;
+}
+
+function recrm_get_module_registry() {
+    $registry      = array();
+    $core_registry = recrm_get_core_module_registry();
+
+    foreach ( $core_registry as $module_key => $module_data ) {
+        $local_manifest = recrm_get_local_module_manifest( $module_key );
+
+        $registry[ $module_key ] = recrm_normalize_module_registry_entry(
+            $module_key,
+            array_merge( $module_data, $local_manifest )
+        );
+    }
+
+    foreach ( recrm_get_local_module_directories() as $module_key ) {
+        if ( isset( $registry[ $module_key ] ) ) {
+            continue;
+        }
+
+        $data = array_merge(
+            array(
+                'label'          => recrm_format_module_label( $module_key ),
+                'description'    => sprintf( 'Локально встановлений модуль %s.', recrm_format_module_label( $module_key ) ),
+                'always_on'      => false,
+                'depends_on'     => array(),
+                'github_managed' => false,
+                'github_path'    => 'modules/' . $module_key,
+            ),
+            recrm_get_local_module_manifest( $module_key )
+        );
+
+        $registry[ $module_key ] = recrm_normalize_module_registry_entry( $module_key, $data );
+    }
+
+    $registry = recrm_sort_module_registry( $registry );
+
+    return apply_filters( 'recrm_module_registry', $registry );
+}
+
+function recrm_get_manageable_module_registry() {
+    $registry           = recrm_get_module_registry();
+    $remote_directories = recrm_get_remote_module_directories();
+
+    foreach ( $remote_directories as $module_key ) {
+        $remote_manifest = recrm_get_remote_module_manifest( $module_key );
+
+        if ( isset( $registry[ $module_key ] ) ) {
+            $registry[ $module_key ] = recrm_normalize_module_registry_entry(
+                $module_key,
+                array_merge( $registry[ $module_key ], $remote_manifest, array(
+                    'github_managed' => true,
+                    'github_path'    => 'modules/' . $module_key,
+                ) )
+            );
+            continue;
+        }
+
+        $data = array_merge(
+            array(
+                'label'          => recrm_format_module_label( $module_key ),
+                'description'    => sprintf( 'Модуль %s, доступний для встановлення з GitHub.', recrm_format_module_label( $module_key ) ),
+                'always_on'      => false,
+                'depends_on'     => array(),
+                'github_managed' => true,
+                'github_path'    => 'modules/' . $module_key,
+            ),
+            $remote_manifest
+        );
+
+        $registry[ $module_key ] = recrm_normalize_module_registry_entry( $module_key, $data );
+    }
+
+    return recrm_sort_module_registry( $registry );
 }
 
 function recrm_get_module_option_key() {
@@ -39,11 +367,17 @@ function recrm_get_module_option_key() {
 }
 
 function recrm_get_default_module_settings() {
-    return array(
-        'filter' => '1',
-        'seo'    => '1',
-        'import' => '1',
-    );
+    $defaults = array();
+
+    foreach ( recrm_get_module_registry() as $module_key => $module_data ) {
+        if ( ! empty( $module_data['always_on'] ) ) {
+            continue;
+        }
+
+        $defaults[ $module_key ] = recrm_is_module_installed( $module_key ) ? '1' : '0';
+    }
+
+    return $defaults;
 }
 
 function recrm_get_module_settings() {
@@ -66,8 +400,8 @@ function recrm_get_module_settings() {
 }
 
 function recrm_update_module_settings( $settings ) {
-    $current = recrm_get_module_settings();
-    $merged  = array_merge( $current, is_array( $settings ) ? $settings : array() );
+    $current  = recrm_get_module_settings();
+    $merged   = array_merge( $current, is_array( $settings ) ? $settings : array() );
     $registry = recrm_get_module_registry();
 
     foreach ( $registry as $module_key => $module_data ) {
@@ -102,6 +436,10 @@ function recrm_is_module_enabled( $module_key ) {
     $settings = recrm_get_module_settings();
 
     if ( empty( $settings[ $module_key ] ) ) {
+        return false;
+    }
+
+    if ( ! recrm_is_module_installed( $module_key ) ) {
         return false;
     }
 

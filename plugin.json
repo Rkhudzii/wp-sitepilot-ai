@@ -1,0 +1,15 @@
+{
+  "name": "RE CRM XML Import",
+  "version": "2.4.0",
+  "description": "Модульний плагін для нерухомості з GitHub-first ядром, самооновленням і менеджером модулів.",
+  "author": "Roman",
+  "homepage": "https://github.com/Rkhudzii/wp-sitepilot-ai",
+  "package": "https://codeload.github.com/Rkhudzii/wp-sitepilot-ai/zip/refs/heads/main",
+  "requires": "6.0",
+  "requires_php": "7.4",
+  "tested": "6.8",
+  "sections": {
+    "description": "Оновлення ядра RE CRM завантажується прямо з GitHub-репозиторію. WordPress бачить нову версію та може оновити плагін вручну або автоматично.",
+    "changelog": "Версія 2.4.0: додано ядро GitHub-first із самооновленням і ручною перевіркою оновлень."
+  }
+}

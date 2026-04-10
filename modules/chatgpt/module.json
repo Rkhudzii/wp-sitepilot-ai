@@ -1,0 +1,7 @@
+{
+  "label": "ChatGPT",
+  "description": "Налаштування підключення ChatGPT та окрема адмін-сторінка для AI-функцій.",
+  "depends_on": [],
+  "github_managed": true,
+  "github_path": "modules/chatgpt"
+}
