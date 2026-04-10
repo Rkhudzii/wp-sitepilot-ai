@@ -86,7 +86,7 @@ class RECRM_GitHub_Updater {
         $source = $this->get_github_source();
 
         return sprintf(
-            'https://raw.githubusercontent.com/%s/%s/%s/plugin.json',
+            'https://raw.githubusercontent.com/%s/%s/%s/version.json',
             rawurlencode( $source['owner'] ),
             rawurlencode( $source['repo'] ),
             rawurlencode( $source['branch'] )
