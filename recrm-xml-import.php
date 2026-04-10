@@ -20,6 +20,13 @@ define( 'WPSP_AI_VERSION', '2.4.1' );
 define( 'WPSP_AI_GITHUB_REPO', 'Rkhudzii/wp-sitepilot-ai' );
 define( 'WPSP_AI_GITHUB_BRANCH', 'main' );
 
+/* Сумісність зі старим кодом */
+define( 'RECRM_XML_IMPORT_PATH', WPSP_AI_PATH );
+define( 'RECRM_XML_IMPORT_URL', WPSP_AI_URL );
+define( 'RECRM_XML_IMPORT_VERSION', WPSP_AI_VERSION );
+define( 'RECRM_XML_IMPORT_GITHUB_REPO', WPSP_AI_GITHUB_REPO );
+define( 'RECRM_XML_IMPORT_GITHUB_BRANCH', WPSP_AI_GITHUB_BRANCH );
+
 require_once WPSP_AI_PATH . 'includes/core/helpers.php';
 require_once WPSP_AI_PATH . 'includes/core/module-manager.php';
 require_once WPSP_AI_PATH . 'includes/core/github-updater.php';
