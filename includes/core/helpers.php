@@ -158,7 +158,7 @@ function recrm_should_query_remote_modules() {
     $page   = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
     $action = isset( $_GET['action'] ) ? sanitize_key( wp_unslash( $_GET['action'] ) ) : '';
 
-    if ( 'recrm-settings' === $page || 'recrm_manage_module' === $action ) {
+    if ( 'recrm_manage_module' === $action ) {
         return true;
     }
 
@@ -289,6 +289,12 @@ function recrm_sort_module_registry( $registry ) {
 }
 
 function recrm_get_module_registry() {
+    static $registry_cache = null;
+
+    if ( null !== $registry_cache ) {
+        return $registry_cache;
+    }
+
     $registry      = array();
     $core_registry = recrm_get_core_module_registry();
 
@@ -323,10 +329,18 @@ function recrm_get_module_registry() {
 
     $registry = recrm_sort_module_registry( $registry );
 
-    return apply_filters( 'recrm_module_registry', $registry );
+    $registry_cache = apply_filters( 'recrm_module_registry', $registry );
+
+    return $registry_cache;
 }
 
 function recrm_get_manageable_module_registry() {
+    static $manageable_registry_cache = null;
+
+    if ( null !== $manageable_registry_cache ) {
+        return $manageable_registry_cache;
+    }
+
     $registry           = recrm_get_module_registry();
     $remote_directories = recrm_get_remote_module_directories();
 
@@ -359,7 +373,9 @@ function recrm_get_manageable_module_registry() {
         $registry[ $module_key ] = recrm_normalize_module_registry_entry( $module_key, $data );
     }
 
-    return recrm_sort_module_registry( $registry );
+    $manageable_registry_cache = recrm_sort_module_registry( $registry );
+
+    return $manageable_registry_cache;
 }
 
 function recrm_get_module_option_key() {
@@ -381,6 +397,12 @@ function recrm_get_default_module_settings() {
 }
 
 function recrm_get_module_settings() {
+    static $settings_cache = null;
+
+    if ( null !== $settings_cache ) {
+        return $settings_cache;
+    }
+
     $settings = get_option( recrm_get_module_option_key(), array() );
     if ( ! is_array( $settings ) ) {
         $settings = array();
@@ -402,7 +424,9 @@ function recrm_get_module_settings() {
         }
     }
 
-    return $settings;
+    $settings_cache = $settings;
+
+    return $settings_cache;
 }
 
 function recrm_update_module_settings( $settings ) {

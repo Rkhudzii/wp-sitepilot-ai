@@ -28,7 +28,7 @@ function recrm_get_module_bootstrap_file( $module_key ) {
 }
 
 function recrm_is_module_installed( $module_key ) {
-    $registry = function_exists( 'recrm_get_manageable_module_registry' ) ? recrm_get_manageable_module_registry() : recrm_get_module_registry();
+    $registry = recrm_get_module_registry();
 
     if ( ! isset( $registry[ $module_key ] ) ) {
         return false;
@@ -52,7 +52,8 @@ function recrm_get_module_github_path( $module_key ) {
 }
 
 function recrm_is_module_github_managed( $module_key ) {
-    $registry = function_exists( 'recrm_get_manageable_module_registry' ) ? recrm_get_manageable_module_registry() : recrm_get_module_registry();
+    $registry = recrm_get_module_registry();
+
     return ! empty( $registry[ $module_key ]['github_managed'] );
 }
 
@@ -125,7 +126,7 @@ function recrm_handle_manage_module_action() {
         exit;
     }
 
-    if ( ! recrm_is_module_github_managed( $module_key ) ) {
+    if ( empty( $registry[ $module_key ]['github_managed'] ) ) {
         recrm_set_module_manager_notice( 'error', 'Цей модуль не керується через GitHub.' );
         wp_safe_redirect( $redirect );
         exit;
@@ -161,12 +162,13 @@ function recrm_handle_manage_module_action() {
 
 function recrm_install_module_from_github( $module_key, $force_sync = false ) {
     $module_key = sanitize_key( $module_key );
+    $registry   = function_exists( 'recrm_get_manageable_module_registry' ) ? recrm_get_manageable_module_registry() : recrm_get_module_registry();
 
-    if ( ! recrm_is_module_github_managed( $module_key ) ) {
+    if ( empty( $registry[ $module_key ]['github_managed'] ) ) {
         return new WP_Error( 'recrm_module_not_remote', 'Модуль не підтримує встановлення з GitHub.' );
     }
 
-    $github_path = recrm_get_module_github_path( $module_key );
+    $github_path = ! empty( $registry[ $module_key ]['github_path'] ) ? trim( (string) $registry[ $module_key ]['github_path'], '/' ) : '';
     if ( '' === $github_path ) {
         return new WP_Error( 'recrm_module_missing_path', 'Не знайдено шлях до модуля в GitHub.' );
     }

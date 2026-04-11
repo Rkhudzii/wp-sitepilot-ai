@@ -106,6 +106,22 @@ function recrm_register_settings() {
     );
 
     add_settings_section(
+        'recrm_modules_section',
+        'Модулі',
+        '__return_false',
+        'recrm-settings'
+    );
+
+    add_settings_field(
+        'modules',
+        'Увімкнення модулів',
+        'recrm_settings_field_modules',
+        'recrm-settings',
+        'recrm_modules_section'
+    );
+
+
+    add_settings_section(
         'recrm_catalog_section',
         'Каталог і загальні параметри',
         '__return_false',

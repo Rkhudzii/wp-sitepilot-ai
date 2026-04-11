@@ -1,7 +1,7 @@
 <?php
 header( 'Content-Type: application/json; charset=utf-8' );
 
-$version = '2.4.4';
+$version = '2.4.6';
 
 echo json_encode(
     array(
@@ -17,7 +17,7 @@ echo json_encode(
         'tested'       => '6.8',
         'sections'     => array(
             'description' => 'Оновлення ядра WP SitePilot AI завантажується прямо з GitHub-репозиторію без окремих релізів.',
-            'changelog'   => 'Версія ' . $version . ': виправлено самооновлення, ручну перевірку оновлень і менеджер модулів.',
+            'changelog'   => 'Версія ' . $version . ': прибрано GitHub-запити зі сторінки налаштувань, прискорено менеджер модулів і стабілізовано автооновлення.',
         ),
     ),
     JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT
