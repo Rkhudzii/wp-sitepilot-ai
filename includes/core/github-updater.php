@@ -4,11 +4,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class RECRM_GitHub_Updater {
-    const CACHE_KEY = 'recrm_core_update_meta_v1';
+    const CACHE_KEY       = 'recrm_core_update_meta_v2';
+    const FORCE_QUERY_ARG = 'recrm_force_core_check';
 
     protected static $instance = null;
     protected $plugin_file;
     protected $plugin_basename;
+    protected $plugin_slug;
 
     public static function boot() {
         if ( null === self::$instance ) {
@@ -21,15 +23,84 @@ class RECRM_GitHub_Updater {
     private function __construct() {
         $this->plugin_file     = RECRM_XML_IMPORT_PATH . 'recrm-xml-import.php';
         $this->plugin_basename = plugin_basename( $this->plugin_file );
+        $this->plugin_slug     = dirname( $this->plugin_basename );
 
         add_filter( 'pre_set_site_transient_update_plugins', array( $this, 'inject_update' ) );
         add_filter( 'plugins_api', array( $this, 'plugins_api' ), 20, 3 );
+        add_filter( 'upgrader_source_selection', array( $this, 'fix_source_directory_name' ), 10, 4 );
+        add_filter( 'auto_update_plugin', array( $this, 'maybe_enable_auto_update' ), 10, 2 );
 
+        add_action( 'admin_post_recrm_refresh_core_update', array( $this, 'handle_manual_refresh' ) );
         add_action( 'upgrader_process_complete', array( $this, 'clear_cache_after_upgrade' ), 10, 2 );
     }
 
     public function get_plugin_basename() {
         return $this->plugin_basename;
+    }
+
+    protected function is_settings_page_request() {
+        if ( ! is_admin() ) {
+            return false;
+        }
+
+        $page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+
+        return 'recrm-settings' === $page;
+    }
+
+    protected function is_force_refresh_request() {
+        return ! empty( $_GET[ self::FORCE_QUERY_ARG ] );
+    }
+
+    protected function should_skip_remote_requests() {
+        if ( defined( 'WP_CLI' ) && WP_CLI ) {
+            return false;
+        }
+
+        if ( function_exists( 'wp_doing_cron' ) && wp_doing_cron() ) {
+            return false;
+        }
+
+        if ( $this->is_force_refresh_request() ) {
+            return false;
+        }
+
+        return $this->is_settings_page_request();
+    }
+
+    public function get_manual_refresh_url() {
+        $url = add_query_arg(
+            array(
+                'action' => 'recrm_refresh_core_update',
+            ),
+            admin_url( 'admin-post.php' )
+        );
+
+        return wp_nonce_url( $url, 'recrm_refresh_core_update' );
+    }
+
+    public function handle_manual_refresh() {
+        if ( ! current_user_can( 'update_plugins' ) ) {
+            wp_die( esc_html__( 'Недостатньо прав.', 'wp-sitepilot-ai' ) );
+        }
+
+        check_admin_referer( 'recrm_refresh_core_update' );
+
+        $this->clear_cached_remote_data();
+        delete_site_transient( 'update_plugins' );
+        wp_clean_plugins_cache( true );
+        wp_update_plugins();
+
+        $redirect = add_query_arg(
+            array(
+                'page'         => 'recrm-settings',
+                'recrm_notice' => 'core_checked',
+            ),
+            admin_url( 'admin.php' )
+        );
+
+        wp_safe_redirect( $redirect );
+        exit;
     }
 
     public function get_github_source() {
@@ -104,10 +175,11 @@ class RECRM_GitHub_Updater {
         return wp_remote_get(
             $url,
             array(
-                'timeout' => 20,
-                'headers' => array(
+                'timeout'     => 8,
+                'redirection' => 3,
+                'headers'     => array(
                     'Accept'     => 'application/json, text/plain;q=0.9, */*;q=0.8',
-                    'User-Agent' => 'RECRM-Core-Updater/' . RECRM_XML_IMPORT_VERSION,
+                    'User-Agent' => 'WP-SitePilot-AI-Updater/' . RECRM_XML_IMPORT_VERSION,
                 ),
             )
         );
@@ -138,6 +210,16 @@ class RECRM_GitHub_Updater {
         return $data;
     }
 
+    protected function normalize_package_url( $package ) {
+        $package = esc_url_raw( (string) $package );
+
+        if ( '' === $package ) {
+            return $this->get_package_url();
+        }
+
+        return $package;
+    }
+
     public function get_remote_metadata( $force = false ) {
         $cached = get_site_transient( self::CACHE_KEY );
         if ( ! $force && is_array( $cached ) ) {
@@ -146,7 +228,7 @@ class RECRM_GitHub_Updater {
 
         $metadata = array(
             'name'         => 'WP SitePilot AI',
-            'slug'         => dirname( $this->plugin_basename ),
+            'slug'         => $this->plugin_slug,
             'plugin'       => $this->plugin_basename,
             'version'      => '',
             'description'  => 'Оновлення ядра плагіна із GitHub.',
@@ -169,7 +251,7 @@ class RECRM_GitHub_Updater {
                 $metadata['description']  = ! empty( $json['description'] ) ? wp_kses_post( $json['description'] ) : $metadata['description'];
                 $metadata['author']       = ! empty( $json['author'] ) ? sanitize_text_field( $json['author'] ) : $metadata['author'];
                 $metadata['homepage']     = ! empty( $json['homepage'] ) ? esc_url_raw( $json['homepage'] ) : $metadata['homepage'];
-                $metadata['package']      = ! empty( $json['package'] ) ? esc_url_raw( $json['package'] ) : $metadata['package'];
+                $metadata['package']      = ! empty( $json['package'] ) ? $this->normalize_package_url( $json['package'] ) : $metadata['package'];
                 $metadata['tested']       = ! empty( $json['tested'] ) ? sanitize_text_field( $json['tested'] ) : '';
                 $metadata['requires']     = ! empty( $json['requires'] ) ? sanitize_text_field( $json['requires'] ) : '';
                 $metadata['requires_php'] = ! empty( $json['requires_php'] ) ? sanitize_text_field( $json['requires_php'] ) : '';
@@ -212,6 +294,8 @@ class RECRM_GitHub_Updater {
             return new WP_Error( 'recrm_updater_no_version', 'GitHub не повернув версію плагіна.' );
         }
 
+        $metadata['package'] = $this->normalize_package_url( $metadata['package'] );
+
         set_site_transient( self::CACHE_KEY, $metadata, 6 * HOUR_IN_SECONDS );
 
         return $metadata;
@@ -240,6 +324,10 @@ class RECRM_GitHub_Updater {
             $transient = new stdClass();
         }
 
+        if ( $this->should_skip_remote_requests() ) {
+            return $transient;
+        }
+
         $state = $this->get_update_state();
 
         if ( is_wp_error( $state ) || empty( $state['has_update'] ) ) {
@@ -247,17 +335,17 @@ class RECRM_GitHub_Updater {
         }
 
         $update = new stdClass();
-        $update->slug           = dirname( $this->plugin_basename );
-        $update->plugin         = $this->plugin_basename;
-        $update->new_version    = $state['remote_version'];
-        $update->url            = $state['homepage'];
-        $update->package        = $state['package'];
-        $update->icons          = array();
-        $update->banners        = array();
-        $update->tested         = ! empty( $state['remote']['tested'] ) ? $state['remote']['tested'] : '';
-        $update->requires       = ! empty( $state['remote']['requires'] ) ? $state['remote']['requires'] : '';
-        $update->requires_php   = ! empty( $state['remote']['requires_php'] ) ? $state['remote']['requires_php'] : '';
-        $update->compatibility  = new stdClass();
+        $update->slug          = $this->plugin_slug;
+        $update->plugin        = $this->plugin_basename;
+        $update->new_version   = $state['remote_version'];
+        $update->url           = $state['homepage'];
+        $update->package       = $state['package'];
+        $update->icons         = array();
+        $update->banners       = array();
+        $update->tested        = ! empty( $state['remote']['tested'] ) ? $state['remote']['tested'] : '';
+        $update->requires      = ! empty( $state['remote']['requires'] ) ? $state['remote']['requires'] : '';
+        $update->requires_php  = ! empty( $state['remote']['requires_php'] ) ? $state['remote']['requires_php'] : '';
+        $update->compatibility = new stdClass();
 
         $transient->response[ $this->plugin_basename ] = $update;
 
@@ -265,7 +353,11 @@ class RECRM_GitHub_Updater {
     }
 
     public function plugins_api( $result, $action, $args ) {
-        if ( 'plugin_information' !== $action || empty( $args->slug ) || dirname( $this->plugin_basename ) !== $args->slug ) {
+        if ( 'plugin_information' !== $action || empty( $args->slug ) || $this->plugin_slug !== $args->slug ) {
+            return $result;
+        }
+
+        if ( $this->should_skip_remote_requests() ) {
             return $result;
         }
 
@@ -277,7 +369,7 @@ class RECRM_GitHub_Updater {
 
         $info = new stdClass();
         $info->name          = $remote['name'];
-        $info->slug          = dirname( $this->plugin_basename );
+        $info->slug          = $this->plugin_slug;
         $info->version       = $remote['version'];
         $info->author        = $remote['author'];
         $info->homepage      = $remote['homepage'];
@@ -291,6 +383,56 @@ class RECRM_GitHub_Updater {
         $info->icons         = array();
 
         return $info;
+    }
+
+    public function fix_source_directory_name( $source, $remote_source, $upgrader, $hook_extra ) {
+        if ( empty( $hook_extra['action'] ) || 'update' !== $hook_extra['action'] ) {
+            return $source;
+        }
+
+        if ( empty( $hook_extra['type'] ) || 'plugin' !== $hook_extra['type'] ) {
+            return $source;
+        }
+
+        if ( empty( $hook_extra['plugins'] ) || ! in_array( $this->plugin_basename, (array) $hook_extra['plugins'], true ) ) {
+            return $source;
+        }
+
+        $desired_source = trailingslashit( $remote_source ) . $this->plugin_slug;
+
+        if ( untrailingslashit( $source ) === untrailingslashit( $desired_source ) ) {
+            return $source;
+        }
+
+        global $wp_filesystem;
+
+        if ( empty( $wp_filesystem ) ) {
+            require_once ABSPATH . 'wp-admin/includes/file.php';
+            WP_Filesystem();
+        }
+
+        if ( empty( $wp_filesystem ) ) {
+            return $source;
+        }
+
+        if ( $wp_filesystem->exists( $desired_source ) ) {
+            $wp_filesystem->delete( $desired_source, true );
+        }
+
+        $moved = $wp_filesystem->move( $source, $desired_source, true );
+        if ( ! $moved ) {
+            return new WP_Error( 'recrm_updater_source_move_failed', 'Не вдалося підготувати папку плагіна для оновлення.' );
+        }
+
+        return $desired_source;
+    }
+
+    public function maybe_enable_auto_update( $update, $item ) {
+        if ( empty( $item->plugin ) || $this->plugin_basename !== $item->plugin ) {
+            return $update;
+        }
+
+        return '1' === get_option( 'recrm_core_auto_update', '0' );
     }
 
     public function clear_cache_after_upgrade( $upgrader, $options ) {

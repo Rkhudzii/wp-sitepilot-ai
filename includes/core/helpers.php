@@ -38,13 +38,13 @@ function recrm_get_core_module_registry() {
             'github_managed' => true,
             'github_path'    => 'modules/import',
         ),
-        'chatgpt' => array(
-            'label'          => 'ChatGPT',
-            'description'    => 'Налаштування підключення ChatGPT та окрема адмін-сторінка для AI-функцій.',
+        'chatbot' => array(
+            'label'          => 'Chat Bot',
+            'description'    => 'Модуль підключення AI-чату.',
             'always_on'      => false,
             'depends_on'     => array(),
             'github_managed' => true,
-            'github_path'    => 'modules/chatgpt',
+            'github_path'    => 'modules/chatbot',
         ),
     );
 }
@@ -386,6 +386,12 @@ function recrm_get_module_settings() {
         $settings = array();
     }
 
+    if ( isset( $settings['chatgpt'] ) && ! isset( $settings['chatbot'] ) ) {
+        $settings['chatbot'] = ! empty( $settings['chatgpt'] ) ? '1' : '0';
+    }
+
+    unset( $settings['chatgpt'] );
+
     $settings = wp_parse_args( $settings, recrm_get_default_module_settings() );
 
     foreach ( recrm_get_module_registry() as $module_key => $module_data ) {
@@ -400,8 +406,16 @@ function recrm_get_module_settings() {
 }
 
 function recrm_update_module_settings( $settings ) {
-    $current  = recrm_get_module_settings();
-    $merged   = array_merge( $current, is_array( $settings ) ? $settings : array() );
+    $current = recrm_get_module_settings();
+    $incoming = is_array( $settings ) ? $settings : array();
+
+    if ( isset( $incoming['chatgpt'] ) && ! isset( $incoming['chatbot'] ) ) {
+        $incoming['chatbot'] = $incoming['chatgpt'];
+    }
+
+    unset( $incoming['chatgpt'] );
+
+    $merged   = array_merge( $current, $incoming );
     $registry = recrm_get_module_registry();
 
     foreach ( $registry as $module_key => $module_data ) {

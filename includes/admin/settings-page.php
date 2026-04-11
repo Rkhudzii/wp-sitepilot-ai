@@ -356,11 +356,26 @@ function recrm_get_core_update_notice() {
 }
 
 function recrm_settings_field_core_updates() {
-    $settings = recrm_get_settings();
+    $settings       = recrm_get_settings();
+    $cached_remote  = get_site_transient( 'recrm_core_update_meta_v2' );
+    $remote_version = is_array( $cached_remote ) && ! empty( $cached_remote['version'] ) ? $cached_remote['version'] : 'Ще не перевірено';
+    $status_label   = 'Без автоперевірки';
+
+    if ( is_array( $cached_remote ) && ! empty( $cached_remote['version'] ) ) {
+        $status_label = version_compare( RECRM_XML_IMPORT_VERSION, $cached_remote['version'], '<' ) ? 'Є новіша версія' : 'Актуальна версія';
+    }
+
+    $refresh_url = '';
+    if ( class_exists( 'RECRM_GitHub_Updater' ) ) {
+        $updater = RECRM_GitHub_Updater::boot();
+        if ( is_object( $updater ) && method_exists( $updater, 'get_manual_refresh_url' ) ) {
+            $refresh_url = $updater->get_manual_refresh_url();
+        }
+    }
     ?>
     <div style="display:grid; gap:12px; max-width:860px;">
         <div style="padding:14px 16px; border:1px solid #dbeafe; border-radius:14px; background:#eff6ff; color:#1d4ed8;">
-            Ядро плагіна працює в режимі <strong>GitHub-first</strong>, але перевірка GitHub вимкнена на екрані налаштувань, щоб не гальмувати адмінку.
+            Ядро плагіна працює в режимі <strong>GitHub-first</strong>. На цьому екрані GitHub не опитується автоматично, щоб сторінка не зависала.
         </div>
 
         <div style="padding:14px 16px; border:1px solid #e5e7eb; border-radius:14px; background:#fff;">
@@ -370,20 +385,23 @@ function recrm_settings_field_core_updates() {
                     <div style="margin-top:4px; font-size:18px; font-weight:700;"><?php echo esc_html( RECRM_XML_IMPORT_VERSION ); ?></div>
                 </div>
                 <div>
-                    <div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:.06em;">GitHub версія</div>
-                    <div style="margin-top:4px; font-size:18px; font-weight:700;">Перевірка вручну</div>
+                    <div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:.06em;">Остання перевірена версія</div>
+                    <div style="margin-top:4px; font-size:18px; font-weight:700;"><?php echo esc_html( $remote_version ); ?></div>
                 </div>
                 <div>
                     <div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:.06em;">Статус</div>
-                    <div style="margin-top:4px; font-size:18px; font-weight:700; color:#475569;">Без автоперевірки</div>
+                    <div style="margin-top:4px; font-size:18px; font-weight:700; color:#475569;"><?php echo esc_html( $status_label ); ?></div>
                 </div>
             </div>
 
             <p style="margin:0 0 12px; color:#475569;">
-                Щоб не було довгого завантаження, GitHub не перевіряється автоматично при відкритті цієї сторінки.
+                Тепер плагін може оновлюватися прямо з гілки <strong>main</strong> без окремого GitHub Release. Достатньо змінити версію в плагіні й запушити код.
             </p>
 
             <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:12px;">
+                <?php if ( ! empty( $refresh_url ) ) : ?>
+                    <a class="button button-primary" href="<?php echo esc_url( $refresh_url ); ?>">Перевірити оновлення зараз</a>
+                <?php endif; ?>
                 <a class="button" href="<?php echo esc_url( admin_url( 'plugins.php' ) ); ?>">Сторінка плагінів</a>
             </div>
 
