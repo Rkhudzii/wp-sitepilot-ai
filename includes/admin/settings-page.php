@@ -13,18 +13,18 @@ function recrm_register_settings() {
     );
 
     add_settings_section(
-        'recrm_core_updates_section',
-        'Оновлення ядра',
+        'recrm_modules_section',
+        'Модулі',
         '__return_false',
         'recrm-settings'
     );
 
     add_settings_field(
-        'core_updates',
-        'GitHub-first ядро',
-        'recrm_settings_field_core_updates',
+        'modules',
+        'Керування модулями',
+        'recrm_settings_field_modules',
         'recrm-settings',
-        'recrm_core_updates_section'
+        'recrm_modules_section'
     );
 
     add_settings_section(
@@ -104,22 +104,6 @@ function recrm_register_settings() {
         'recrm-settings',
         'recrm_single_section'
     );
-
-    add_settings_section(
-        'recrm_modules_section',
-        'Модулі',
-        '__return_false',
-        'recrm-settings'
-    );
-
-    add_settings_field(
-        'modules',
-        'Увімкнення модулів',
-        'recrm_settings_field_modules',
-        'recrm-settings',
-        'recrm_modules_section'
-    );
-
 
     add_settings_section(
         'recrm_catalog_section',
@@ -253,6 +237,14 @@ function recrm_register_settings() {
         'recrm-settings',
         'recrm_schema_section'
     );
+
+    add_settings_field(
+        'schema_preview',
+        'Preview JSON-LD',
+        'recrm_settings_field_schema_preview',
+        'recrm-settings',
+        'recrm_schema_section'
+    );
 }
 
 function recrm_get_settings() {
@@ -270,16 +262,10 @@ function recrm_get_settings() {
         'enable_map'              => '1',
         'enable_sticky_sidebar'   => '1',
         'enable_dynamic_seo_menu' => '0',
-        'core_auto_update'        => get_option( 'recrm_core_auto_update', '0' ),
+        'module_filter'           => '1',
+        'module_seo'              => '1',
+        'module_import'           => '1',
     );
-
-    foreach ( recrm_get_module_registry() as $module_key => $module_data ) {
-        if ( ! empty( $module_data['always_on'] ) ) {
-            continue;
-        }
-
-        $defaults[ 'module_' . $module_key ] = recrm_is_module_installed( $module_key ) ? '1' : '0';
-    }
 
     $settings = get_option( 'recrm_settings', array() );
 
@@ -336,156 +322,46 @@ function recrm_sanitize_settings( $input ) {
     $output['enable_map'] = isset( $input['enable_map'] ) ? '1' : '0';
     $output['enable_sticky_sidebar'] = isset( $input['enable_sticky_sidebar'] ) ? '1' : '0';
     $output['enable_dynamic_seo_menu'] = isset( $input['enable_dynamic_seo_menu'] ) ? '1' : '0';
-    $output['core_auto_update'] = isset( $input['core_auto_update'] ) ? '1' : '0';
 
-    update_option( 'recrm_core_auto_update', $output['core_auto_update'], false );
-
-    $module_settings = array();
-
-    foreach ( recrm_get_module_registry() as $module_key => $module_data ) {
-        if ( ! empty( $module_data['always_on'] ) ) {
-            continue;
-        }
-
-        $module_settings[ $module_key ] = isset( $input[ 'module_' . $module_key ] ) ? '1' : '0';
-        $output[ 'module_' . $module_key ] = $module_settings[ $module_key ];
-    }
+    $module_settings = array(
+        'filter' => isset( $input['module_filter'] ) ? '1' : '0',
+        'seo'    => isset( $input['module_seo'] ) ? '1' : '0',
+        'import' => isset( $input['module_import'] ) ? '1' : '0',
+    );
 
     recrm_update_module_settings( $module_settings );
+
+    $output['module_filter'] = $module_settings['filter'];
+    $output['module_seo']    = $module_settings['seo'];
+    $output['module_import'] = $module_settings['import'];
 
     return $output;
 }
 
 
-function recrm_get_core_update_notice() {
-    $notice = isset( $_GET['recrm_notice'] ) ? sanitize_key( wp_unslash( $_GET['recrm_notice'] ) ) : '';
-    $error  = isset( $_GET['recrm_error'] ) ? sanitize_text_field( wp_unslash( $_GET['recrm_error'] ) ) : '';
-
-    $map = array(
-        'core_checked'       => array( 'success', 'Перевірку оновлень завершено.' ),
-        'core_updated'       => array( 'success', 'Ядро плагіна успішно оновлено з GitHub.' ),
-        'core_no_update'     => array( 'info', 'Новішої версії ядра зараз немає.' ),
-        'core_upgrade_error' => array( 'error', $error ? $error : 'Не вдалося оновити ядро плагіна.' ),
-    );
-
-    return isset( $map[ $notice ] ) ? $map[ $notice ] : array();
-}
-
-function recrm_settings_field_core_updates() {
-    $settings       = recrm_get_settings();
-    $cached_remote  = get_site_transient( 'recrm_core_update_meta_v2' );
-    $remote_version = is_array( $cached_remote ) && ! empty( $cached_remote['version'] ) ? $cached_remote['version'] : 'Ще не перевірено';
-    $status_label   = 'Без автоперевірки';
-
-    if ( is_array( $cached_remote ) && ! empty( $cached_remote['version'] ) ) {
-        $status_label = version_compare( RECRM_XML_IMPORT_VERSION, $cached_remote['version'], '<' ) ? 'Є новіша версія' : 'Актуальна версія';
-    }
-
-    $refresh_url = '';
-    if ( class_exists( 'RECRM_GitHub_Updater' ) ) {
-        $updater = RECRM_GitHub_Updater::boot();
-        if ( is_object( $updater ) && method_exists( $updater, 'get_manual_refresh_url' ) ) {
-            $refresh_url = $updater->get_manual_refresh_url();
-        }
-    }
-    ?>
-    <div style="display:grid; gap:12px; max-width:860px;">
-        <div style="padding:14px 16px; border:1px solid #dbeafe; border-radius:14px; background:#eff6ff; color:#1d4ed8;">
-            Ядро плагіна працює в режимі <strong>GitHub-first</strong>. На цьому екрані GitHub не опитується автоматично, щоб сторінка не зависала.
-        </div>
-
-        <div style="padding:14px 16px; border:1px solid #e5e7eb; border-radius:14px; background:#fff;">
-            <div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-bottom:14px;">
-                <div>
-                    <div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:.06em;">Поточна версія</div>
-                    <div style="margin-top:4px; font-size:18px; font-weight:700;"><?php echo esc_html( RECRM_XML_IMPORT_VERSION ); ?></div>
-                </div>
-                <div>
-                    <div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:.06em;">Остання перевірена версія</div>
-                    <div style="margin-top:4px; font-size:18px; font-weight:700;"><?php echo esc_html( $remote_version ); ?></div>
-                </div>
-                <div>
-                    <div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:.06em;">Статус</div>
-                    <div style="margin-top:4px; font-size:18px; font-weight:700; color:#475569;"><?php echo esc_html( $status_label ); ?></div>
-                </div>
-            </div>
-
-            <p style="margin:0 0 12px; color:#475569;">
-                Тепер плагін може оновлюватися прямо з гілки <strong>main</strong> без окремого GitHub Release. Достатньо змінити версію в плагіні й запушити код.
-            </p>
-
-            <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:12px;">
-                <?php if ( ! empty( $refresh_url ) ) : ?>
-                    <a class="button button-primary" href="<?php echo esc_url( $refresh_url ); ?>">Перевірити оновлення зараз</a>
-                <?php endif; ?>
-                <a class="button" href="<?php echo esc_url( admin_url( 'plugins.php' ) ); ?>">Сторінка плагінів</a>
-            </div>
-
-            <label style="display:flex; align-items:center; gap:8px; font-weight:600;">
-                <input type="checkbox" name="recrm_settings[core_auto_update]" value="1" <?php checked( isset( $settings['core_auto_update'] ) ? $settings['core_auto_update'] : '0', '1' ); ?>>
-                Увімкнути автооновлення ядра
-            </label>
-        </div>
-    </div>
-    <?php
-}
-
 function recrm_settings_field_modules() {
     $settings = recrm_get_settings();
     $registry = recrm_get_module_registry();
-    $repo_badge = 'GitHub';
     ?>
-    <div style="display:grid; gap:12px; max-width:860px;">
-        <div style="padding:12px 14px; border:1px solid #dbeafe; border-radius:14px; background:#eff6ff; color:#1d4ed8;">
-            Тут показані локальні модулі плагіна. GitHub не опитується автоматично при відкритті сторінки, щоб не гальмувати адмінку.
-        </div>
-
+    <div style="display:grid; gap:12px; max-width:720px;">
         <?php foreach ( $registry as $module_key => $module_data ) : ?>
-            <?php
-            $is_installed = function_exists( 'recrm_is_module_installed' ) ? recrm_is_module_installed( $module_key ) : true;
-            $is_enabled   = recrm_is_module_enabled( $module_key );
-            $is_remote    = ! empty( $module_data['github_managed'] );
-            ?>
             <div style="padding:14px 16px; border:1px solid #e5e7eb; border-radius:14px; background:#fff;">
-                <div style="display:flex; justify-content:space-between; gap:18px; align-items:flex-start; flex-wrap:wrap;">
-                    <div style="min-width:260px; flex:1 1 360px;">
+                <div style="display:flex; justify-content:space-between; gap:16px; align-items:flex-start;">
+                    <div>
                         <strong style="display:block; margin-bottom:6px;"><?php echo esc_html( $module_data['label'] ); ?></strong>
                         <div style="color:#475569; line-height:1.6;"><?php echo esc_html( $module_data['description'] ); ?></div>
-
-                        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
-                            <?php if ( ! empty( $module_data['always_on'] ) ) : ?>
-                                <span style="display:inline-flex; align-items:center; min-height:28px; padding:0 10px; border-radius:999px; background:#dcfce7; color:#166534; font-weight:700;">Базовий модуль</span>
-                            <?php else : ?>
-                                <span style="display:inline-flex; align-items:center; min-height:28px; padding:0 10px; border-radius:999px; background:<?php echo $is_installed ? '#dcfce7' : '#fee2e2'; ?>; color:<?php echo $is_installed ? '#166534' : '#991b1b'; ?>; font-weight:700;">
-                                    <?php echo $is_installed ? 'Встановлено' : 'Не встановлено'; ?>
-                                </span>
-                                <span style="display:inline-flex; align-items:center; min-height:28px; padding:0 10px; border-radius:999px; background:<?php echo $is_enabled ? '#dbeafe' : '#f1f5f9'; ?>; color:<?php echo $is_enabled ? '#1d4ed8' : '#475569'; ?>; font-weight:700;">
-                                    <?php echo $is_enabled ? 'Увімкнено' : 'Вимкнено'; ?>
-                                </span>
-                            <?php endif; ?>
-                        </div>
-
                         <?php if ( ! empty( $module_data['depends_on'] ) ) : ?>
-                            <div style="margin-top:8px; color:#64748b; font-size:12px;">Залежить від: <?php echo esc_html( implode( ', ', (array) $module_data['depends_on'] ) ); ?></div>
+                            <div style="margin-top:6px; color:#64748b; font-size:12px;">Залежить від: <?php echo esc_html( implode( ', ', (array) $module_data['depends_on'] ) ); ?></div>
                         <?php endif; ?>
                     </div>
-
-                    <div style="display:flex; flex-direction:column; gap:10px; align-items:flex-end; min-width:220px;">
+                    <div>
                         <?php if ( ! empty( $module_data['always_on'] ) ) : ?>
                             <span style="display:inline-flex; min-height:34px; align-items:center; padding:0 12px; border-radius:999px; background:#dcfce7; color:#166534; font-weight:700;">Завжди увімкнено</span>
                         <?php else : ?>
-                            <label style="display:flex; align-items:center; gap:8px; font-weight:600; color:<?php echo $is_installed ? '#0f172a' : '#94a3b8'; ?>;">
-                                <input type="checkbox" name="recrm_settings[module_<?php echo esc_attr( $module_key ); ?>]" value="1" <?php checked( isset( $settings[ 'module_' . $module_key ] ) ? $settings[ 'module_' . $module_key ] : '0', '1' ); ?> <?php disabled( ! $is_installed ); ?>>
-                                Увімкнути модуль
+                            <label>
+                                <input type="checkbox" name="recrm_settings[module_<?php echo esc_attr( $module_key ); ?>]" value="1" <?php checked( $settings[ 'module_' . $module_key ], '1' ); ?>>
+                                Увімкнути
                             </label>
-
-                            <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
-                                <?php if ( $is_remote && ! $is_installed ) : ?>
-                                    <span style="display:inline-flex; min-height:34px; align-items:center; padding:0 12px; border-radius:999px; background:#fef3c7; color:#92400e; font-weight:700;">Модуль недоступний локально</span>
-                                <?php elseif ( $is_remote && $is_installed ) : ?>
-                                    <span style="display:inline-flex; min-height:34px; align-items:center; padding:0 12px; border-radius:999px; background:#dcfce7; color:#166534; font-weight:700;">Модуль доступний локально</span>
-                                <?php endif; ?>
-                            </div>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -532,10 +408,93 @@ function recrm_settings_field_contact_form_shortcode() {
 }
 
 function recrm_settings_field_fallback_image() {
-    $settings = recrm_get_settings();
+    $settings  = recrm_get_settings();
+    $image_url = isset( $settings['fallback_image'] ) ? (string) $settings['fallback_image'] : '';
     ?>
-    <input type="url" name="recrm_settings[fallback_image]" value="<?php echo esc_attr( $settings['fallback_image'] ); ?>" class="large-text" placeholder="https://site.com/uploads/no-image.jpg">
-    <p class="description">Картинка за замовчуванням, якщо в об’єкта немає фото.</p>
+    <div class="recrm-fallback-image-field" style="display:grid; gap:10px; max-width:720px;">
+        <input type="url" id="recrm_fallback_image" name="recrm_settings[fallback_image]" value="<?php echo esc_attr( $image_url ); ?>" class="large-text" placeholder="https://site.com/uploads/no-image.jpg">
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button type="button" class="button button-secondary" id="recrm_pick_fallback_image">Обрати з галереї</button>
+            <button type="button" class="button-link-delete" id="recrm_remove_fallback_image" <?php echo empty( $image_url ) ? 'style="display:none; align-self:center;"' : 'style="align-self:center;"'; ?>>Прибрати фото</button>
+        </div>
+
+        <div id="recrm_fallback_image_preview_wrap" <?php echo empty( $image_url ) ? 'style="display:none;"' : ''; ?>>
+            <img id="recrm_fallback_image_preview" src="<?php echo esc_url( $image_url ); ?>" alt="" style="display:block; width:140px; height:140px; object-fit:cover; border-radius:8px; border:1px solid #dcdcde; background:#fff;">
+        </div>
+
+        <p class="description" style="margin:0;">Картинка за замовчуванням, якщо в об’єкта немає фото.</p>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var input = document.getElementById('recrm_fallback_image');
+        var pickButton = document.getElementById('recrm_pick_fallback_image');
+        var removeButton = document.getElementById('recrm_remove_fallback_image');
+        var previewWrap = document.getElementById('recrm_fallback_image_preview_wrap');
+        var preview = document.getElementById('recrm_fallback_image_preview');
+
+        if (!input || !pickButton || typeof wp === 'undefined' || !wp.media) {
+            return;
+        }
+
+        function updatePreview(url) {
+            if (!preview || !previewWrap || !removeButton) {
+                return;
+            }
+
+            if (url) {
+                preview.src = url;
+                previewWrap.style.display = '';
+                removeButton.style.display = '';
+            } else {
+                preview.src = '';
+                previewWrap.style.display = 'none';
+                removeButton.style.display = 'none';
+            }
+        }
+
+        var frame = wp.media({
+            title: 'Оберіть fallback-зображення',
+            button: {
+                text: 'Використати зображення'
+            },
+            multiple: false,
+            library: {
+                type: 'image'
+            }
+        });
+
+        pickButton.addEventListener('click', function (event) {
+            event.preventDefault();
+            frame.open();
+        });
+
+        frame.on('select', function () {
+            var attachment = frame.state().get('selection').first().toJSON();
+            var url = attachment.url || '';
+
+            if (!url && attachment.sizes) {
+                if (attachment.sizes.full && attachment.sizes.full.url) {
+                    url = attachment.sizes.full.url;
+                } else if (attachment.sizes.large && attachment.sizes.large.url) {
+                    url = attachment.sizes.large.url;
+                }
+            }
+
+            input.value = url;
+            updatePreview(url);
+        });
+
+        if (removeButton) {
+            removeButton.addEventListener('click', function (event) {
+                event.preventDefault();
+                input.value = '';
+                updatePreview('');
+            });
+        }
+    });
+    </script>
     <?php
 }
 
@@ -689,9 +648,27 @@ function recrm_settings_field_schema_company_description() {
     <?php
 }
 
+
+
+
+
+
+
+function recrm_settings_field_schema_preview() {
+    $preview = '';
+
+    if ( function_exists( 'recrm_get_schema_preview_json' ) ) {
+        $preview = recrm_get_schema_preview_json();
+    }
+    ?>
+    <textarea rows="22" class="large-text code" readonly style="font-family: Consolas, Monaco, monospace;"><?php echo esc_textarea( $preview ); ?></textarea>
+    <p class="description">Це preview того JSON-LD, який буде виводитись на сайті згідно з поточними налаштуваннями.</p>
+    <?php
+}
+
+
 function recrm_render_settings_page() {
     $settings = recrm_get_settings();
-    $notice   = recrm_get_core_update_notice();
     $stats = array(
         'phone'   => ! empty( $settings['phone'] ) ? 'Заповнено' : 'Порожньо',
         'email'   => ! empty( $settings['email'] ) ? 'Заповнено' : 'Порожньо',
@@ -774,10 +751,6 @@ function recrm_render_settings_page() {
         </style>
 
         <div class="recrm-settings-shell">
-            <?php if ( ! empty( $notice ) ) : ?>
-                <div class="notice notice-<?php echo esc_attr( $notice[0] ); ?> is-dismissible" style="margin:12px 0 0;"><p><?php echo esc_html( $notice[1] ); ?></p></div>
-            <?php endif; ?>
-
             <div class="recrm-settings-hero">
                 <h1>RE CRM — Налаштування</h1>
                 <p>Тут зібрані головні параметри плагіна: контактні дані, налаштування каталогу, поведінка картки об’єкта, schema-розмітка та експериментальні функції. Секції розбиті на вкладки, щоб не губитися в одному довгому екрані.</p>
@@ -840,9 +813,7 @@ function recrm_render_settings_page() {
                 'Контактні дані': 'Контакти',
                 'Single property': 'Single',
                 'Каталог і загальні параметри': 'Каталог',
-                'Schema.org / JSON-LD': 'Schema',
-                'Оновлення ядра': 'Ядро',
-                'Модулі': 'Модулі'
+                'Schema.org / JSON-LD': 'Schema'
             };
 
             headings.forEach(function (heading, index) {

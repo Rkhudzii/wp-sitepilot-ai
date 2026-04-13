@@ -9,6 +9,7 @@ add_action( 'add_meta_boxes', 'recrm_seo_register_meta_box' );
 add_action( 'save_post', 'recrm_seo_save_post_meta', 20, 2 );
 add_filter( 'pre_get_document_title', 'recrm_seo_filter_document_title', 20 );
 add_action( 'wp_head', 'recrm_seo_output_meta_description', 5 );
+add_action( 'init', 'recrm_seo_enable_page_featured_image_support', 20 );
 
 function recrm_register_seo_import_menu() {
 	add_submenu_page(
@@ -19,6 +20,13 @@ function recrm_register_seo_import_menu() {
 		'recrm-seo',
 		'recrm_render_seo_import_page'
 	);
+}
+
+
+function recrm_seo_enable_page_featured_image_support() {
+	if ( post_type_exists( 'page' ) ) {
+		add_post_type_support( 'page', 'thumbnail' );
+	}
 }
 
 function recrm_get_seo_settings() {
@@ -483,10 +491,6 @@ $trust_pages = function_exists( 'recrm_check_trust_pages' ) ? recrm_check_trust_
 			<div>
 				<div class="recrm-seo-card">
 					<h2>SEO налаштування</h2>
-					<div class="recrm-seo-check" style="margin-bottom:16px;">
-						<span>Індексація сайту</span>
-						<span class="recrm-seo-status <?php echo '0' !== (string) get_option( 'blog_public', '1' ) ? 'ok' : 'bad'; ?>"><?php echo '0' !== (string) get_option( 'blog_public', '1' ) ? 'Увімкнена' : 'Вимкнена'; ?></span>
-					</div>
 					<form method="post">
 						<?php wp_nonce_field( 'recrm_save_seo_settings_action', 'recrm_save_seo_settings_nonce' ); ?>
 

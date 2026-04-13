@@ -513,9 +513,13 @@ public function register_admin_menu() {
 add_action( 'admin_enqueue_scripts', 'recrm_seo_admin_assets' );
 
 function recrm_seo_admin_assets( $hook ) {
-	if ( false === strpos( $hook, 'recrm-seo' ) && 'post.php' !== $hook && 'post-new.php' !== $hook ) {
+	$allowed_hooks = array( 'post.php', 'post-new.php', 're-crm_page_recrm-seo', 're-crm_page_recrm-settings' );
+
+	if ( ! in_array( $hook, $allowed_hooks, true ) && false === strpos( $hook, 'recrm-seo' ) ) {
 		return;
 	}
+
+	wp_enqueue_media();
 
 	$settings = recrm_get_seo_settings();
 
